@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+    "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- Hide Dock icon: this is the canonical key for a menu-bar-only app -->
+    <key>LSUIElement</key>
+    <true/>
+
+    <key>CFBundleName</key>
+    <string>HarbourMaster</string>
+
+    <key>CFBundleDisplayName</key>
+    <string>HarbourMaster</string>
+
+    <key>CFBundleIdentifier</key>
+    <string>com.harbourmaster.app</string>
+
+    <key>CFBundleVersion</key>
+    <string>1</string>
+
+    <key>CFBundleShortVersionString</key>
+    <string>1.0.0</string>
+
+    <key>CFBundleExecutable</key>
+    <string>HarbourMaster</string>
+
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+
+    <key>NSHighResolutionCapable</key>
+    <true/>
+
+    <key>NSPrincipalClass</key>
+    <string>NSApplication</string>
+
+    <!-- macOS 12+ minimum -->
+    <key>LSMinimumSystemVersion</key>
+    <string>12.0</string>
+</dict>
+</plist>
