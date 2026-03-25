@@ -1,0 +1,83 @@
+name: Build & Release
+
+on:
+  push:
+    branches: [main]
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [main]
+
+jobs:
+  # ── Build ────────────────────────────────────────────────────────────────────
+  build:
+    name: Build
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode.app
+
+      - name: Swift version
+        run: swift --version
+
+      - name: Build (release)
+        run: swift build -c release
+
+      - name: Assemble .app bundle
+        run: |
+          APP="HarbourMaster.app"
+          mkdir -p "$APP/Contents/MacOS"
+          cp .build/release/HarbourMaster "$APP/Contents/MacOS/HarbourMaster"
+          cp Resources/Info.plist         "$APP/Contents/Info.plist"
+          printf 'APPL????' >             "$APP/Contents/PkgInfo"
+
+      - name: Zip .app
+        run: ditto -c -k --sequesterRsrc --keepParent HarbourMaster.app HarbourMaster.zip
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: HarbourMaster
+          path: HarbourMaster.zip
+          retention-days: 7
+
+  # ── Release (tags only) ──────────────────────────────────────────────────────
+  release:
+    name: Release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: HarbourMaster
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: HarbourMaster ${{ github.ref_name }}
+          files: HarbourMaster.zip
+          generate_release_notes: true
+          body: |
+            ## Install
+
+            1. Download **HarbourMaster.zip** and unzip it
+            2. Move **HarbourMaster.app** to `/Applications`
+            3. Because the app is not notarized, macOS Gatekeeper will block the first launch.
+               Run this once to clear the quarantine flag:
+               ```bash
+               xattr -cr /Applications/HarbourMaster.app
+               ```
+            4. Open HarbourMaster — look for the network icon in your menu bar
+
+            ## Requirements
+            - macOS 13 Ventura or later
