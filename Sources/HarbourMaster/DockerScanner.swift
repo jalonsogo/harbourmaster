@@ -15,6 +15,8 @@ struct DockerContainer: Equatable, Hashable {
     let composeProject: String?
     let composeService: String?
     let isPaused: Bool
+    var containerCPU: String?
+    var containerMem: String?
 
     var displayName: String { composeService ?? name }
 }
@@ -23,7 +25,7 @@ enum DockerScanner {
 
     static let dockerCommands: Set<String> = ["com.docke", "docker-pro", "docker"]
 
-    // MARK: - Scan
+    // MARK: - Scan running containers
 
     static func scan() -> [Int: DockerContainer] {
         let output = runDocker(["ps", "--format", "{{.ID}}|{{.Names}}|{{.Image}}|{{.Ports}}|{{.Labels}}|{{.Status}}"])
@@ -31,16 +33,42 @@ enum DockerScanner {
         return parse(output: output)
     }
 
+    // MARK: - Container stats
+
+    /// Fetches CPU and memory stats for a list of container IDs (non-streaming).
+    /// Returns a dictionary mapping container ID prefix → (cpu string, mem string).
+    static func fetchStats(ids: [String]) -> [String: (cpu: String, mem: String)] {
+        guard !ids.isEmpty else { return [:] }
+        var args = ["stats", "--no-stream", "--format", "{{.ID}}|{{.CPUPerc}}|{{.MemUsage}}"]
+        args.append(contentsOf: ids)
+        let output = runDocker(args)
+        guard !output.isEmpty else { return [:] }
+
+        var result: [String: (cpu: String, mem: String)] = [:]
+        for line in output.components(separatedBy: "\n") {
+            let parts = line.components(separatedBy: "|")
+            guard parts.count >= 3 else { continue }
+            let id  = parts[0].trimmingCharacters(in: .whitespaces)
+            let cpu = parts[1].trimmingCharacters(in: .whitespaces)
+            // MemUsage is like "128MiB / 2GiB" — keep only the used part
+            let memFull = parts[2].trimmingCharacters(in: .whitespaces)
+            let mem = memFull.components(separatedBy: " / ").first ?? memFull
+            guard !id.isEmpty else { continue }
+            result[id] = (cpu: cpu, mem: mem)
+        }
+        return result
+    }
+
     // MARK: - Container actions
 
     @discardableResult
-    static func stop(_ container: DockerContainer) -> Bool    { run("stop",    container) }
+    static func stop(_ container: DockerContainer) -> Bool    { run("stop",    container.name) }
     @discardableResult
-    static func pause(_ container: DockerContainer) -> Bool   { run("pause",   container) }
+    static func pause(_ container: DockerContainer) -> Bool   { run("pause",   container.name) }
     @discardableResult
-    static func unpause(_ container: DockerContainer) -> Bool { run("unpause", container) }
+    static func unpause(_ container: DockerContainer) -> Bool { run("unpause", container.name) }
     @discardableResult
-    static func restart(_ container: DockerContainer) -> Bool { run("restart", container) }
+    static func restart(_ container: DockerContainer) -> Bool { run("restart", container.name) }
 
     // MARK: - Log command string (for terminal)
 
@@ -57,11 +85,11 @@ enum DockerScanner {
 
     // MARK: - Private helpers
 
-    private static func run(_ command: String, _ container: DockerContainer) -> Bool {
+    private static func run(_ command: String, _ name: String) -> Bool {
         guard let path = dockerPath() else { return false }
         let p = Process()
         p.executableURL = URL(fileURLWithPath: path)
-        p.arguments = [command, container.name]
+        p.arguments = [command, name]
         p.standardOutput = Pipe()
         p.standardError = Pipe()
         try? p.run()
@@ -130,7 +158,8 @@ enum DockerScanner {
                     id: id, name: name, image: image,
                     hostPort: hostPort, containerPort: containerPort, proto: proto,
                     composeProject: composeProject, composeService: composeService,
-                    isPaused: isPaused
+                    isPaused: isPaused,
+                    containerCPU: nil, containerMem: nil
                 )
             }
         }

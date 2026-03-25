@@ -14,10 +14,6 @@ struct PortInfo: Equatable, Hashable {
     let memoryMB: Double?
     let dockerContainer: DockerContainer?
 
-    static let devPorts: Set<Int> = [
-        3000, 3001, 5173, 8080, 8000, 4000, 4200, 5001, 8888, 9000
-    ]
-
     /// Known macOS system process names (COMMAND column prefix from lsof).
     static let systemProcesses: Set<String> = [
         "ControlCe",  // AirPlay Receiver (ports 5000, 7000)
@@ -37,9 +33,29 @@ struct PortInfo: Equatable, Hashable {
         "AirPlayXPC", // AirPlay XPC service
     ]
 
-    /// True if this port belongs to the curated list of common dev ports.
+    /// Process name prefixes treated as dev runtimes regardless of port number.
+    static let devRuntimes: Set<String> = [
+        "node", "bun",                          // JS runtimes
+        "Python", "python", "python3",          // Python
+        "ruby", "puma", "unicorn", "rails",     // Ruby
+        "java", "kotlin",                       // JVM
+        "go", "air",                            // Go (air = live reload)
+        "rust", "cargo",                        // Rust
+        "php", "php-fpm",                       // PHP
+        "deno",                                 // Deno
+        "elixir", "beam.smp",                   // Elixir/Erlang
+        "uvicorn", "gunicorn", "hypercorn",     // Python ASGI/WSGI servers
+        "flask", "django",                      // Python frameworks (sometimes show as process name)
+        "vite", "webpack", "next",              // JS bundlers/frameworks
+        "netlify", "vercel",                    // Local dev CLIs
+    ]
+
+    /// True if this port is on a well-known dev port number OR run by a known dev runtime.
     var isDevPort: Bool {
-        PortInfo.devPorts.contains(port)
+        let s = AppSettings.shared
+        return s.customDevPorts.contains(port)
+            || s.customDevPortRanges.contains(where: { $0.contains(port) })
+            || PortInfo.devRuntimes.contains(processName)
     }
 
     /// True if this process is a known macOS system service.

@@ -41,6 +41,10 @@ cp "$SCRIPT_DIR/Resources/Info.plist" "$CONTENTS_DIR/Info.plist"
 # Create PkgInfo (required by macOS for .app bundles)
 printf "APPL????" > "$CONTENTS_DIR/PkgInfo"
 
+# Ad-hoc code sign — required for UNUserNotificationCenter to register with the system
+echo "==> Code signing (ad-hoc)…"
+codesign --force --deep -s - "$BUNDLE_DIR"
+
 echo ""
 echo "✓  Built:  ${BUNDLE_DIR}"
 echo ""

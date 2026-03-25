@@ -31,6 +31,33 @@ final class AppSettings: ObservableObject {
         didSet { UserDefaults.standard.set(showDockerSection, forKey: Keys.showDockerSection) }
     }
 
+    @Published var notificationsEnabled: Bool {
+        didSet { UserDefaults.standard.set(notificationsEnabled, forKey: Keys.notificationsEnabled) }
+    }
+
+    @Published var customDevPorts: Set<Int> {
+        didSet { UserDefaults.standard.set(Array(customDevPorts), forKey: Keys.customDevPorts) }
+    }
+
+    @Published var customDevPortRanges: [DevPortRange] {
+        didSet {
+            let encoded = customDevPortRanges.map { [$0.lower, $0.upper] }
+            UserDefaults.standard.set(encoded, forKey: Keys.customDevPortRanges)
+        }
+    }
+
+    /// Returns ports from the individual list that fall inside any stored range.
+    func portsSubsumedByRanges() -> Set<Int> {
+        customDevPorts.filter { port in
+            customDevPortRanges.contains(where: { $0.contains(port) })
+        }
+    }
+
+    /// Returns ranges that overlap with a candidate range (excluding itself).
+    func rangesOverlapping(_ candidate: DevPortRange) -> [DevPortRange] {
+        customDevPortRanges.filter { $0.overlaps(candidate) }
+    }
+
     // MARK: - Init
 
     private init() {
@@ -39,7 +66,23 @@ final class AppSettings: ObservableObject {
         terminalChoice     = TerminalChoice(rawValue:     ud.string(forKey: Keys.terminal)        ?? "") ?? .default
         containerManager   = ContainerManager(rawValue:   ud.string(forKey: Keys.containerManager) ?? "") ?? .autoDetect
         showDockerSection  = ud.object(forKey: Keys.showDockerSection) as? Bool ?? true
+        notificationsEnabled = ud.object(forKey: Keys.notificationsEnabled) as? Bool ?? true
         launchAtLogin      = SMAppService.mainApp.status == .enabled
+
+        if let stored = ud.array(forKey: Keys.customDevPorts) as? [Int] {
+            customDevPorts = Set(stored)
+        } else {
+            customDevPorts = [3000, 3001, 5173, 8080, 8000, 4000, 4200, 5001, 8888, 9000]
+        }
+
+        if let stored = ud.array(forKey: Keys.customDevPortRanges) as? [[Int]] {
+            customDevPortRanges = stored.compactMap {
+                guard $0.count == 2 else { return nil }
+                return DevPortRange(lower: $0[0], upper: $0[1])
+            }
+        } else {
+            customDevPortRanges = []
+        }
     }
 
     // MARK: - Login item
@@ -122,8 +165,6 @@ final class AppSettings: ObservableObject {
         }
     }
 
-    // MARK: - Keys
-
     // MARK: - Container manager deep link
 
     func openContainerInManager(_ container: DockerContainer, fallbackPort: Int) {
@@ -147,11 +188,44 @@ final class AppSettings: ObservableObject {
         if let url = URL(string: "http://localhost:\(port)") { openURL(url) }
     }
 
+    // MARK: - Keys
+
     private enum Keys {
-        static let browser           = "browserChoice"
-        static let terminal          = "terminalChoice"
-        static let containerManager  = "containerManager"
-        static let showDockerSection = "showDockerSection"
+        static let browser              = "browserChoice"
+        static let terminal             = "terminalChoice"
+        static let containerManager     = "containerManager"
+        static let showDockerSection    = "showDockerSection"
+        static let notificationsEnabled = "notificationsEnabled"
+        static let customDevPorts       = "customDevPorts"
+        static let customDevPortRanges  = "customDevPortRanges"
+    }
+}
+
+// MARK: - DevPortRange
+
+struct DevPortRange: Identifiable, Equatable {
+    let id = UUID()
+    let lower: Int
+    let upper: Int
+
+    var displayString: String { "\(lower) – \(upper)" }
+
+    func contains(_ port: Int) -> Bool { port >= lower && port <= upper }
+
+    func overlaps(_ other: DevPortRange) -> Bool {
+        lower <= other.upper && other.lower <= upper
+    }
+
+    /// Parse from "3000-3400" or "3000–3400"
+    static func parse(_ input: String) -> DevPortRange? {
+        let parts = input
+            .replacingOccurrences(of: "–", with: "-")
+            .replacingOccurrences(of: " ", with: "")
+            .components(separatedBy: "-")
+        guard parts.count == 2,
+              let lo = Int(parts[0]), let hi = Int(parts[1]),
+              lo > 0, hi <= 65535, lo < hi else { return nil }
+        return DevPortRange(lower: lo, upper: hi)
     }
 }
 

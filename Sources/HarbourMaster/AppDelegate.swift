@@ -12,6 +12,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var statusItem: NSStatusItem!
     private let menu = NSMenu()
     private var lastPorts: [PortInfo] = []
+    private var previousPortSet: Set<Int> = []
+    private var pollingTimer: DispatchSourceTimer?
 
     // MARK: - NSApplicationDelegate
 
@@ -33,15 +35,88 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.delegate = self
         statusItem.menu = menu
 
-        lastPorts = PortScanner.scan()
-        buildMenu(ports: lastPorts)
+
+        // Initial scan in background
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            let result = PortScanner.scan()
+            DispatchQueue.main.async {
+                self?.lastPorts = result.ports
+                self?.previousPortSet = Set(result.ports.map { $0.port })
+                self?.buildMenu(ports: result.ports)
+                self?.updateStatusBarIcon(ports: result.ports)
+                self?.startPolling()
+            }
+        }
     }
 
     // MARK: - NSMenuDelegate
 
     func menuWillOpen(_ menu: NSMenu) {
-        lastPorts = PortScanner.scan()
+        // Show cached results immediately
         buildMenu(ports: lastPorts)
+        // Scan in background, then refresh
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            let result = PortScanner.scan()
+            DispatchQueue.main.async {
+                self?.lastPorts = result.ports
+                self?.buildMenu(ports: result.ports)
+                self?.checkForPortChanges(newPorts: result.ports)
+                self?.updateStatusBarIcon(ports: result.ports)
+            }
+        }
+    }
+
+    // MARK: - Notifications
+
+    private func checkForPortChanges(newPorts: [PortInfo]) {
+        guard AppSettings.shared.notificationsEnabled else { return }
+        let newPortSet = Set(newPorts.map { $0.port })
+
+        let opened = newPortSet.subtracting(previousPortSet)
+        let closed  = previousPortSet.subtracting(newPortSet)
+
+        for port in opened {
+            let name = newPorts.first(where: { $0.port == port })?.processName ?? "process"
+            HUDNotification.show(title: "\(name) started on :\(port)",
+                                 body: "A new service is listening on localhost:\(port)",
+                                 opened: true)
+        }
+        for port in closed {
+            HUDNotification.show(title: ":\(port) closed",
+                                 body: "The service on localhost:\(port) stopped listening",
+                                 opened: false)
+        }
+
+        previousPortSet = newPortSet
+    }
+
+
+    // MARK: - Background polling
+
+    private func startPolling() {
+        let timer = DispatchSource.makeTimerSource(queue: DispatchQueue.global(qos: .background))
+        timer.schedule(deadline: .now() + 5, repeating: 5)
+        timer.setEventHandler { [weak self] in
+            guard let self else { return }
+            let result = PortScanner.scan()
+            DispatchQueue.main.async {
+                self.lastPorts = result.ports
+                self.checkForPortChanges(newPorts: result.ports)
+                self.updateStatusBarIcon(ports: result.ports)
+            }
+        }
+        timer.resume()
+        pollingTimer = timer
+    }
+
+    // MARK: - Status bar icon
+
+    private func updateStatusBarIcon(ports: [PortInfo]) {
+        guard let button = statusItem.button else { return }
+        if let img = NSImage(systemSymbolName: "network", accessibilityDescription: "HarbourMaster") {
+            img.isTemplate = true
+            button.image = img
+        }
     }
 
     // MARK: - Menu building
@@ -75,12 +150,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 devPorts.forEach { addPortItem($0, to: menu) }
             }
 
-            // ── Docker — grouped by Compose project ──────────────────────────
+            // ── Docker — one line per compose project ────────────────────────
             if !dockerPorts.isEmpty && AppSettings.shared.showDockerSection {
                 if !devPorts.isEmpty { menu.addItem(.separator()) }
                 addSectionHeader("Docker", to: menu)
 
-                // Group by compose project; nil project = standalone containers
+                // Build ordered project map
                 var projectMap: [(key: String, ports: [PortInfo])] = []
                 var seen = Set<String>()
                 for p in dockerPorts {
@@ -93,13 +168,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                     })
                 }
 
-                for (index, entry) in projectMap.enumerated() {
-                    if index > 0 { menu.addItem(.separator()) }
-                    if !entry.key.isEmpty {
-                        addProjectHeader(entry.key, to: menu)
+                for entry in projectMap {
+                    if entry.key.isEmpty {
+                        // Standalone containers — inline, no submenu wrapper
+                        entry.ports.forEach { addPortItem($0, to: menu) }
+                    } else {
+                        // Compose project → one submenu item, chevron on right
+                        let projectItem = NSMenuItem(
+                            title: "\(entry.key)  (\(entry.ports.count))",
+                            action: nil,
+                            keyEquivalent: ""
+                        )
+                        projectItem.image = sfSymbol("square.stack")
+                        let projectSubmenu = NSMenu()
+                        entry.ports.forEach { addPortItem($0, to: projectSubmenu) }
+                        projectItem.submenu = projectSubmenu
+                        menu.addItem(projectItem)
                     }
-                    entry.ports.forEach { addPortItem($0, to: menu) }
                 }
+
             }
 
             // ── Other (submenu with System + Other groups) ───────────────────
@@ -193,10 +280,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         browserItem.target = self
         browserItem.representedObject = info
         sub.addItem(browserItem)
+
+        // ── Copy URL ─────────────────────────────────────────────────────────
+        let copyURLItem = NSMenuItem(title: "Copy URL", action: #selector(copyURL(_:)), keyEquivalent: "")
+        copyURLItem.image = sfSymbol("doc.on.clipboard")
+        copyURLItem.target = self
+        copyURLItem.representedObject = info
+        sub.addItem(copyURLItem)
         sub.addItem(.separator())
 
         // ── Resource usage ───────────────────────────────────────────────────
-        if let cpu = info.cpuPercent, let mem = info.memoryMB {
+        // For Docker containers, prefer container-level stats
+        if let c = info.dockerContainer, let cpu = c.containerCPU, let mem = c.containerMem {
+            let resItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
+            resItem.image = sfSymbol("cpu")
+            resItem.isEnabled = false
+            resItem.attributedTitle = labeledString(label: "Resources", value: "CPU \(cpu)   RAM \(mem)")
+            sub.addItem(resItem)
+            sub.addItem(.separator())
+        } else if let cpu = info.cpuPercent, let mem = info.memoryMB {
             let resItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
             resItem.image = sfSymbol("cpu")
             resItem.isEnabled = false
@@ -205,35 +307,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             sub.addItem(.separator())
         }
 
-        // ── Docker container info ────────────────────────────────────────────
+        // ── Docker container info — click any row to copy its value ──────────
         if let c = info.dockerContainer {
-            let nameItem = NSMenuItem(title: c.name, action: #selector(openInDockerDesktop(_:)), keyEquivalent: "")
-            nameItem.image = sfSymbol("cube")
-            nameItem.target = self
-            nameItem.representedObject = info
-            nameItem.attributedTitle = labeledString(label: "Container", value: c.name)
-
-            let imageItem = NSMenuItem(title: c.image, action: #selector(openInDockerDesktop(_:)), keyEquivalent: "")
-            imageItem.image = sfSymbol("photo.stack")
-            imageItem.target = self
-            imageItem.representedObject = info
-            imageItem.attributedTitle = labeledString(label: "Image", value: c.image)
-
-            let mappingItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
-            mappingItem.image = sfSymbol("arrow.right.circle")
-            mappingItem.isEnabled = false
-            mappingItem.attributedTitle = labeledString(label: "Port", value: "\(c.hostPort) → \(c.containerPort)/\(c.proto)")
-
-            sub.addItem(nameItem)
-            sub.addItem(imageItem)
-            if let project = c.composeProject {
-                let projectItem = NSMenuItem(title: project, action: nil, keyEquivalent: "")
-                projectItem.image = sfSymbol("square.stack")
-                projectItem.isEnabled = false
-                projectItem.attributedTitle = labeledString(label: "Project", value: project)
-                sub.addItem(projectItem)
+            func copyItem(label: String, value: String, symbol: String) -> NSMenuItem {
+                let item = NSMenuItem(title: value, action: #selector(copyStringValue(_:)), keyEquivalent: "")
+                item.image = sfSymbol(symbol)
+                item.target = self
+                item.representedObject = value
+                item.attributedTitle = labeledString(label: label, value: value)
+                return item
             }
-            sub.addItem(mappingItem)
+
+            sub.addItem(copyItem(label: "Container", value: c.name,  symbol: "cube"))
+            sub.addItem(copyItem(label: "Image",     value: c.image, symbol: "photo.stack"))
+            if let project = c.composeProject {
+                sub.addItem(copyItem(label: "Project", value: project, symbol: "square.stack"))
+            }
+            sub.addItem(copyItem(label: "Port", value: "\(c.hostPort) → \(c.containerPort)/\(c.proto)", symbol: "arrow.right.circle"))
+
+            // Open in container manager
+            let ddItem = NSMenuItem(title: "Open in Docker Desktop", action: #selector(openInDockerDesktop(_:)), keyEquivalent: "")
+            ddItem.image = sfSymbol("arrow.up.forward.app")
+            ddItem.target = self
+            ddItem.representedObject = info
+            sub.addItem(ddItem)
+
             sub.addItem(.separator())
         }
 
@@ -304,6 +402,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 projectLogsItem.representedObject = info
                 sub.addItem(projectLogsItem)
             }
+
+            // ── Open Shell ───────────────────────────────────────────────────
+            let shellItem = NSMenuItem(title: "Open Shell", action: #selector(dockerExec(_:)), keyEquivalent: "")
+            shellItem.image = sfSymbol("terminal")
+            shellItem.target = self
+            shellItem.representedObject = info
+            sub.addItem(shellItem)
         } else {
             let killItem = NSMenuItem(title: "Kill Process (PID \(info.pid))", action: #selector(killProcess(_:)), keyEquivalent: "")
             killItem.image = sfSymbol("xmark.circle", color: .systemRed)
@@ -319,8 +424,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     // MARK: - Actions
 
     @objc private func refreshMenu() {
-        lastPorts = PortScanner.scan()
-        buildMenu(ports: lastPorts)
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            let result = PortScanner.scan()
+            DispatchQueue.main.async {
+                self?.lastPorts = result.ports
+                self?.buildMenu(ports: result.ports)
+                self?.updateStatusBarIcon(ports: result.ports)
+            }
+        }
     }
 
     @objc private func openInDockerDesktop(_ sender: NSMenuItem) {
@@ -339,6 +450,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         AppSettings.shared.openURL(url)
     }
 
+    @objc private func copyURL(_ sender: NSMenuItem) {
+        guard let info = sender.representedObject as? PortInfo else { return }
+        let pb = NSPasteboard.general
+        pb.clearContents()
+        pb.setString("http://localhost:\(info.port)", forType: .string)
+    }
+
     @objc private func revealInFinder(_ sender: NSMenuItem) {
         guard let info = sender.representedObject as? PortInfo, let cwd = info.cwd else { return }
         NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: cwd)
@@ -347,6 +465,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     @objc private func openInTerminal(_ sender: NSMenuItem) {
         guard let info = sender.representedObject as? PortInfo, let cwd = info.cwd else { return }
         AppSettings.shared.openTerminal(at: cwd)
+    }
+
+    @objc private func copyStringValue(_ sender: NSMenuItem) {
+        guard let value = sender.representedObject as? String else { return }
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(value, forType: .string)
     }
 
     @objc private func copyPath(_ sender: NSMenuItem) {
@@ -391,6 +515,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         guard let c = (sender.representedObject as? PortInfo)?.dockerContainer,
               let cmd = DockerScanner.composeLogsCommand(for: c) else { return }
         AppSettings.shared.runCommandInTerminal(cmd)
+    }
+
+    @objc private func dockerExec(_ sender: NSMenuItem) {
+        guard let c = (sender.representedObject as? PortInfo)?.dockerContainer else { return }
+        AppSettings.shared.runCommandInTerminal("docker exec -it \(c.name) /bin/sh")
     }
 
     private func scheduleRefresh() {

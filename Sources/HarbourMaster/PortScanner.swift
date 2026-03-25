@@ -5,34 +5,65 @@
 
 import Foundation
 
+struct PortScanResult {
+    let ports: [PortInfo]
+}
+
 enum PortScanner {
 
     // MARK: - Public API
 
     /// Synchronously scans all TCP LISTEN ports and resolves each process's working directory.
-    /// Returns an array sorted first by isDevPort (dev ports first), then by port number.
-    static func scan() -> [PortInfo] {
-        let output = runLsof()
-        var ports = parse(output: output)
-        let pids = ports.map { $0.pid }
-        let cwds        = resolveCWDs(pids: pids)
-        let resources   = resolveResources(pids: pids)
-        let dockerPorts = DockerScanner.scan()
-        ports = ports.map {
-            PortInfo(
-                port: $0.port,
-                processName: $0.processName,
-                pid: $0.pid,
-                cwd: cwds[$0.pid],
-                cpuPercent: resources[$0.pid]?.cpu,
-                memoryMB:   resources[$0.pid]?.mem,
-                dockerContainer: dockerPorts[$0.port]
-            )
+    /// Returns a PortScanResult sorted first by isDevPort (dev ports first), then by port number.
+    static func scan() -> PortScanResult {
+        // Run all slow operations concurrently
+        let group = DispatchGroup()
+        var lsofOutput = ""
+        var dockerPorts: [Int: DockerContainer] = [:]
+        var stats: [String: (cpu: String, mem: String)] = [:]
+
+        group.enter()
+        DispatchQueue.global().async {
+            lsofOutput = runLsof()
+            group.leave()
         }
-        return ports.sorted {
+
+        group.enter()
+        DispatchQueue.global().async {
+            let running = DockerScanner.scan()
+            let ids = Array(Set(running.values.map { $0.id }))
+            stats = DockerScanner.fetchStats(ids: ids)
+            dockerPorts = running
+            group.leave()
+        }
+
+        group.wait()
+
+        var ports = parse(output: lsofOutput)
+        let pids = ports.map { $0.pid }
+        let cwds      = resolveCWDs(pids: pids)
+        let resources = resolveResources(pids: pids)
+
+        // Merge container stats
+        for (port, var container) in dockerPorts {
+            let shortID = String(container.id.prefix(12))
+            if let s = stats[container.id] ?? stats[shortID] {
+                container.containerCPU = s.cpu
+                container.containerMem = s.mem
+            }
+            dockerPorts[port] = container
+        }
+
+        ports = ports.map {
+            PortInfo(port: $0.port, processName: $0.processName, pid: $0.pid,
+                     cwd: cwds[$0.pid], cpuPercent: resources[$0.pid]?.cpu,
+                     memoryMB: resources[$0.pid]?.mem, dockerContainer: dockerPorts[$0.port])
+        }
+        let sortedPorts = ports.sorted {
             if $0.isDevPort != $1.isDevPort { return $0.isDevPort }
             return $0.port < $1.port
         }
+        return PortScanResult(ports: sortedPorts)
     }
 
     // MARK: - Private helpers
