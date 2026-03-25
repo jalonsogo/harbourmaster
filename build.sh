@@ -38,6 +38,16 @@ cp "$BINARY" "$MACOS_DIR/${APP_NAME}"
 # Copy Info.plist
 cp "$SCRIPT_DIR/Resources/Info.plist" "$CONTENTS_DIR/Info.plist"
 
+# Copy app icon if present
+if [[ -f "$SCRIPT_DIR/Resources/AppIcon.icns" ]]; then
+    cp "$SCRIPT_DIR/Resources/AppIcon.icns" "$RESOURCES_DIR/AppIcon.icns"
+fi
+
+# Copy menu bar icon if present
+if [[ -f "$SCRIPT_DIR/Resources/MenuBaricon.pdf" ]]; then
+    cp "$SCRIPT_DIR/Resources/MenuBaricon.pdf" "$RESOURCES_DIR/MenuBaricon.pdf"
+fi
+
 # Create PkgInfo (required by macOS for .app bundles)
 printf "APPL????" > "$CONTENTS_DIR/PkgInfo"
 

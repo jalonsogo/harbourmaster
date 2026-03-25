@@ -1,6 +1,22 @@
-# HarbourMaster ⚓
+<p align="center">
+  <img src="Screenshots/AppIcon.png" width="128" alt="HarbourMaster icon">
+</p>
+
+# HarbourMaster
 
 A native macOS menu bar app that shows every TCP port currently in use on your machine — with deep integrations for Docker, process management, and developer tooling.
+
+## Screenshots
+
+<p align="center">
+  <img src="Screenshots/Screen 1.png" width="320" alt="Main menu">
+  <img src="Screenshots/Screen 2.png" width="320" alt="Docker section">
+  <img src="Screenshots/Screen 3.png" width="320" alt="Port details">
+</p>
+<p align="center">
+  <img src="Screenshots/settings 1.png" width="320" alt="Settings — General">
+  <img src="Screenshots/settings 2.png" width="320" alt="Settings — Dev Ports">
+</p>
 
 ## Features
 

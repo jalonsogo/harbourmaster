@@ -23,12 +23,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
 
         if let button = statusItem.button {
-            if let image = NSImage(systemSymbolName: "network", accessibilityDescription: "HarbourMaster") {
-                image.isTemplate = true
-                button.image = image
-            } else {
-                button.title = "⚓"
-            }
+            button.image = menuBarIcon()
             button.toolTip = "HarbourMaster – TCP port monitor"
         }
 
@@ -111,12 +106,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     // MARK: - Status bar icon
 
-    private func updateStatusBarIcon(ports: [PortInfo]) {
-        guard let button = statusItem.button else { return }
-        if let img = NSImage(systemSymbolName: "network", accessibilityDescription: "HarbourMaster") {
+    private func menuBarIcon() -> NSImage {
+        if let img = NSImage(named: "MenuBaricon") {
+            img.size = NSSize(width: 18, height: 18)
             img.isTemplate = true
-            button.image = img
+            return img
         }
+        let img = NSImage(systemSymbolName: "network", accessibilityDescription: "HarbourMaster") ?? NSImage()
+        img.isTemplate = true
+        return img
+    }
+
+    private func updateStatusBarIcon(ports: [PortInfo]) {
+        statusItem.button?.image = menuBarIcon()
     }
 
     // MARK: - Menu building
