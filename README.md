@@ -2,119 +2,66 @@
   <img src="Screenshots/AppIcon.png" width="128" alt="HarbourMaster icon">
 </p>
 
-# HarbourMaster
-
-A native macOS menu bar app that shows every TCP port currently in use on your machine — with deep integrations for Docker, process management, and developer tooling.
-
-## Screenshots
+<h1 align="center">HarbourMaster</h1>
+<p align="center">Know what's running on your ports.</p>
 
 <p align="center">
-  <img src="Screenshots/Screen 1.png" width="320" alt="Main menu">
-  <img src="Screenshots/Screen 2.png" width="320" alt="Docker section">
-  <img src="Screenshots/Screen 3.png" width="320" alt="Port details">
+  <a href="https://github.com/jalonsogo/harbourmaster/releases/latest">
+    <img src="https://img.shields.io/github/v/release/jalonsogo/harbourmaster?style=flat-square&color=34d058&label=Download" alt="Download">
+  </a>
+  <img src="https://img.shields.io/badge/macOS-13%2B-blue?style=flat-square" alt="macOS 13+">
+  <img src="https://img.shields.io/badge/license-MIT-lightgrey?style=flat-square" alt="MIT">
 </p>
+
+<br>
+
 <p align="center">
-  <img src="Screenshots/settings 1.png" width="320" alt="Settings — General">
-  <img src="Screenshots/settings 2.png" width="320" alt="Settings — Dev Ports">
+  <img src="Screenshots/Screen 1.png" width="280">
+  <img src="Screenshots/Screen 2.png" width="280">
+  <img src="Screenshots/Screen 3.png" width="280">
 </p>
+
+---
+
+HarbourMaster lives in your menu bar and shows every TCP port currently in use — instantly, without opening a terminal. It detects dev servers, Docker containers, and macOS system services, and tells you exactly what's running and where.
 
 ## Features
 
-### Port monitoring
-- Scans all TCP ports in LISTEN state **concurrently** (lsof + Docker + ps run in parallel)
-- **Background polling every 5 seconds** — detects port changes without opening the menu
-- Groups ports into **Dev Ports**, **Docker**, and **Other** sections
-- **Dev Ports** includes any port run by a known runtime (node, python, bun, go, ruby, deno, rust, java, …) regardless of port number, plus a configurable list of port numbers
+**Port monitoring**
+- Background scan every 5 seconds — notified the moment a port opens or closes via a HUD toast (no permissions required)
+- Automatically recognises dev runtimes (node, python, bun, go, ruby, deno, rust, java…) regardless of port number
+- Configurable dev port list with individual ports and ranges (e.g. `3000–3400`), with overlap warnings
 
-### Notifications
-- **Floating HUD toast** appears in the top-right corner when a port opens or closes — no system notification permissions required
-- Toggle on/off in Settings
-
-### Color legend
-| Icon | Meaning |
-|------|---------|
-| 🟢 `circle.fill` green | Dev port — known runtime or configured dev port number |
-| 🔵 `circle.fill` blue | Other user process |
-| 🟢 `shippingbox.fill` green | Docker container — running |
-| ⚪ `shippingbox.fill` gray | Docker container — paused |
-| 🟠 `shield.fill` orange | macOS system service (AirPlay, Handoff, …) |
-
-### Per-port submenu
-Every port shows:
-- **Open in Browser** — always first; uses your preferred browser (configurable)
-- **Copy URL** — copies `http://localhost:<port>` to clipboard
-- **CPU %** and **RAM** usage (container-level stats for Docker ports)
-- **Open in Finder** — reveals the process working directory
-- **Open in Terminal** — opens the working directory in your preferred terminal
-- **Copy Path**
-- **Kill Process** (with a safety confirmation for macOS system services)
-
-### Docker integration
-- Ports mapped from Docker containers are detected and grouped by **Compose project** — one line per stack, hover to expand services
-- Each container row shows container name, image, project, and port mapping — **click any row to copy its value**
-- **Open in Docker Desktop / OrbStack** — dedicated action per container
-- **Restart**, **Pause/Unpause**, **Stop** the container directly from the menu
-- **View Container Logs** — opens `docker logs -f <name>` in your terminal
-- **View Project Logs** — opens `docker compose logs -f` for the whole stack
-- **Open Shell** — opens `docker exec -it <name> /bin/sh` in your terminal
-- Container **CPU %** and **memory** from `docker stats` (not host process RSS)
-
-### Settings (`⌘,`)
-Four-tab toolbar window (System Settings style):
-
-**General**
-- Launch at login via `SMAppService`
-- Browser — Default, Safari, Chrome, Firefox, Arc, Brave, Edge (shows only installed)
-- Terminal — Default, iTerm2, Ghostty, Kitty, Warp, Alacritty, Hyper (shows only installed)
-- Notifications toggle
+**Per-port actions**
+- Open in browser · Copy URL · Open in Finder · Open in Terminal · Copy path · Kill process
 
 **Docker**
-- Show/hide Docker section in menu
-- Container manager — Auto-detect / Docker Desktop / OrbStack (affects deep-link behaviour)
+- Ports resolved to real container names and images via `docker ps`
+- Grouped by Compose project — one line per stack, hover to expand services
+- Per-container: Restart · Pause/Unpause · Stop · View Logs · View Project Logs · Open Shell
+- Opens containers in Docker Desktop or OrbStack (auto-detected)
+- Real CPU/memory stats from `docker stats`, not host proxy RSS
 
-**Dev Ports**
-- Add/remove individual port numbers
-- Add port **ranges** (e.g. `3000-3400`) — warns if an existing port falls inside the range
-- Range overlap detection
+**Color legend**
 
-**Legend**
-- Icon and colour reference
+| | Meaning |
+|--|---------|
+| 🟢 circle | Dev port — known runtime or configured port |
+| 🔵 circle | Other user process |
+| 🟢 box | Docker container — running |
+| ⚪ box | Docker container — paused |
+| 🟠 shield | macOS system service (AirPlay, Handoff…) |
+
+## Settings
+
+Four-tab window (`⌘,`) — launch at login, preferred browser, preferred terminal, Docker container manager (Docker Desktop / OrbStack), configurable dev ports and ranges.
+
+<p align="center">
+  <img src="Screenshots/settings 1.png" width="380">
+  <img src="Screenshots/settings 2.png" width="380">
+</p>
 
 ## Requirements
+
 - macOS 13 Ventura or later
 - Docker CLI (optional — required for Docker features)
-
-## Build & run
-
-```bash
-git clone https://github.com/jalonsogo/harbourmaster.git
-cd harbourmaster
-./build.sh        # builds, assembles .app bundle, ad-hoc signs
-open HarbourMaster.app
-```
-
-### Install to /Applications
-
-```bash
-./install.sh
-```
-
-> **Note:** The app is ad-hoc signed (not notarized). On first launch macOS may block it. Run:
-> ```bash
-> xattr -cr /Applications/HarbourMaster.app
-> ```
-
-## Project structure
-
-```
-Sources/HarbourMaster/
-├── main.swift                     # NSApplication entry point
-├── AppDelegate.swift              # NSStatusItem, menu building, all actions
-├── PortInfo.swift                 # Port data model + dev runtime detection
-├── PortScanner.swift              # Concurrent lsof + ps + Docker scanning
-├── DockerScanner.swift            # docker ps parsing, stats, container actions
-├── AppSettings.swift              # UserDefaults-backed settings + routing helpers
-├── SettingsWindowController.swift # NSToolbar-based settings window
-├── SettingsView.swift             # SwiftUI tab content (General/Docker/Dev Ports/Legend)
-└── HUDNotification.swift          # Floating toast notification panel
-```
