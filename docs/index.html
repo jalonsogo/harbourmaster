@@ -23,7 +23,7 @@
       --mono:    "SF Mono", "Fira Code", "Cascadia Code", monospace;
     }
 
-    html { scroll-behavior: smooth; }
+    html { scroll-behavior: smooth; font-size: 18px; }
     body {
       background: var(--bg);
       color: var(--t1);
@@ -113,11 +113,11 @@
     }
 
     .hero h1 {
-      font-size: clamp(48px, 7vw, 88px);
-      font-weight: 700;
-      letter-spacing: -3px;
-      line-height: 1.0;
-      margin-bottom: 24px;
+      font-size: clamp(64px, 10vw, 136px);
+      font-weight: 800;
+      letter-spacing: -4px;
+      line-height: 0.95;
+      margin-bottom: 32px;
       position: relative; z-index: 1;
       color: var(--t1);
     }
@@ -127,9 +127,9 @@
     }
 
     .hero-sub {
-      font-size: 17px; color: var(--t2);
-      max-width: 480px; line-height: 1.7;
-      margin-bottom: 48px;
+      font-size: 21px; color: var(--t2);
+      max-width: 480px; line-height: 1.6;
+      margin-bottom: 52px;
       position: relative; z-index: 1;
     }
 
@@ -186,15 +186,15 @@
 
     .label {
       font-size: 11px; font-weight: 600;
-      letter-spacing: 1.5px; text-transform: uppercase;
-      color: var(--t3); margin-bottom: 20px;
+      letter-spacing: 2px; text-transform: uppercase;
+      color: var(--t3); margin-bottom: 24px;
     }
     .section-title {
-      font-size: clamp(28px, 4vw, 44px);
-      font-weight: 700; letter-spacing: -1.5px;
-      line-height: 1.1; margin-bottom: 16px;
+      font-size: clamp(44px, 6vw, 80px);
+      font-weight: 800; letter-spacing: -3px;
+      line-height: 1.0; margin-bottom: 20px;
     }
-    .section-body { font-size: 16px; color: var(--t2); max-width: 480px; line-height: 1.7; }
+    .section-body { font-size: 18px; color: var(--t2); max-width: 520px; line-height: 1.7; }
 
     /* ─── FEATURE GRID ────────────────────────────────── */
     .feat-grid {
@@ -216,10 +216,10 @@
     .feat-num {
       font-size: 11px; color: var(--t3);
       font-family: var(--mono);
-      margin-bottom: 20px;
+      margin-bottom: 24px;
     }
-    .feat h3 { font-size: 15px; font-weight: 600; margin-bottom: 8px; letter-spacing: -0.2px; }
-    .feat p { font-size: 13px; color: var(--t2); line-height: 1.6; }
+    .feat h3 { font-size: 20px; font-weight: 700; margin-bottom: 10px; letter-spacing: -0.5px; }
+    .feat p { font-size: 15px; color: var(--t2); line-height: 1.65; }
 
     /* ─── DOCKER ──────────────────────────────────────── */
     .docker-section {
@@ -238,9 +238,9 @@
     .docker-list li .tag {
       font-family: var(--mono); font-size: 11px;
       color: var(--t3); white-space: nowrap;
-      margin-top: 1px; min-width: 64px;
+      margin-top: 3px; min-width: 64px;
     }
-    .docker-list li .desc { color: var(--t2); line-height: 1.5; }
+    .docker-list li .desc { color: var(--t2); line-height: 1.6; font-size: 15px; }
     .docker-list li .desc strong { color: var(--t1); font-weight: 500; }
 
     .docker-screen {
@@ -289,11 +289,11 @@
       text-align: center;
     }
     .cta h2 {
-      font-size: clamp(36px, 5vw, 60px);
-      font-weight: 700; letter-spacing: -2px;
-      line-height: 1.05; margin-bottom: 20px;
+      font-size: clamp(52px, 8vw, 96px);
+      font-weight: 800; letter-spacing: -3px;
+      line-height: 0.95; margin-bottom: 24px;
     }
-    .cta p { font-size: 15px; color: var(--t2); margin-bottom: 40px; }
+    .cta p { font-size: 18px; color: var(--t2); margin-bottom: 48px; }
 
     /* ─── FOOTER ──────────────────────────────────────── */
     footer {
@@ -307,6 +307,33 @@
     .footer-links { display: flex; gap: 24px; }
 
     /* ─── RESPONSIVE ──────────────────────────────────── */
+    /* ─── LIGHTBOX ────────────────────────────────────── */
+    .lightbox {
+      display: none; position: fixed; inset: 0; z-index: 999;
+      background: rgba(0,0,0,0.92);
+      align-items: center; justify-content: center;
+      cursor: zoom-out;
+      backdrop-filter: blur(8px);
+    }
+    .lightbox.open { display: flex; }
+    .lightbox img {
+      max-width: 90vw; max-height: 90vh;
+      border-radius: var(--radius);
+      box-shadow: 0 40px 120px rgba(0,0,0,0.8);
+      cursor: default;
+    }
+    .lightbox-close {
+      position: absolute; top: 24px; right: 24px;
+      width: 36px; height: 36px;
+      border-radius: 50%; background: rgba(255,255,255,0.1);
+      border: none; color: var(--t1); font-size: 20px;
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+      transition: background .15s;
+    }
+    .lightbox-close:hover { background: rgba(255,255,255,0.2); }
+    .shots-inner img { cursor: zoom-in; }
+    .settings-shots img { cursor: zoom-in; }
+
     @media (max-width: 768px) {
       nav { padding: 0 20px; }
       .nav-right a:not(.nav-download) { display: none; }
@@ -487,5 +514,26 @@
   </div>
 </footer>
 
+<!-- LIGHTBOX -->
+<div class="lightbox" id="lightbox">
+  <button class="lightbox-close" id="lbClose">✕</button>
+  <img id="lbImg" src="" alt="">
+</div>
+
+<script>
+  const lb    = document.getElementById('lightbox');
+  const lbImg = document.getElementById('lbImg');
+
+  document.querySelectorAll('.shots-inner img, .settings-shots img, .docker-screen').forEach(img => {
+    img.addEventListener('click', () => {
+      lbImg.src = img.src;
+      lb.classList.add('open');
+    });
+  });
+
+  lb.addEventListener('click', e => { if (e.target !== lbImg) lb.classList.remove('open'); });
+  document.getElementById('lbClose').addEventListener('click', () => lb.classList.remove('open'));
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') lb.classList.remove('open'); });
+</script>
 </body>
 </html>
