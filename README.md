@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="Screenshots/AppIcon.png" width="128" alt="HarbourMaster icon">
+  <img src="Screenshots/Anchor3d.png" width="200" alt="HarbourMaster">
 </p>
 
 <h1 align="center">HarbourMaster</h1>
@@ -16,9 +16,9 @@
 <br>
 
 <p align="center">
-  <img src="Screenshots/Screen 1.png" width="280">
-  <img src="Screenshots/Screen 2.png" width="280">
-  <img src="Screenshots/Screen 3.png" width="280">
+  <img src="Screenshots/screen1.png" width="280">
+  <img src="Screenshots/screen2.png" width="280">
+  <img src="Screenshots/screen3.png" width="280">
 </p>
 
 ---
@@ -57,8 +57,8 @@ HarbourMaster lives in your menu bar and shows every TCP port currently in use �
 Four-tab window (`⌘,`) — launch at login, preferred browser, preferred terminal, Docker container manager (Docker Desktop / OrbStack), configurable dev ports and ranges.
 
 <p align="center">
-  <img src="Screenshots/settings 1.png" width="380">
-  <img src="Screenshots/settings 2.png" width="380">
+  <img src="Screenshots/settings1.png" width="380">
+  <img src="Screenshots/settings2.png" width="380">
 </p>
 
 ## Requirements
