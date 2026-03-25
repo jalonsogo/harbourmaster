@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HarbourMaster — Know what's running on your ports</title>
+  <meta name="description" content="A native macOS menu bar app that shows every TCP port in use on your machine, with deep Docker integration and developer tooling.">
+  <meta property="og:title" content="HarbourMaster">
+  <meta property="og:description" content="Know what's running on your ports. Native macOS menu bar app.">
+  <meta property="og:image" content="AppIcon.png">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --navy:   #0b1929;
+      --navy2:  #0f2240;
+      --card:   #132a4a;
+      --green:  #34d058;
+      --blue:   #4d9de0;
+      --orange: #f0a500;
+      --text:   #e8edf2;
+      --muted:  #7a94b0;
+      --border: rgba(255,255,255,0.07);
+      --radius: 14px;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--navy);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif;
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── Nav ── */
+    nav {
+      position: sticky; top: 0; z-index: 100;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 16px 48px;
+      background: rgba(11,25,41,0.85);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+    }
+    .nav-brand { display: flex; align-items: center; gap: 10px; font-weight: 600; font-size: 17px; }
+    .nav-brand img { width: 28px; height: 28px; border-radius: 6px; }
+    .nav-links { display: flex; gap: 32px; }
+    .nav-links a { color: var(--muted); text-decoration: none; font-size: 14px; transition: color .2s; }
+    .nav-links a:hover { color: var(--text); }
+    .nav-cta {
+      background: var(--green); color: #0b1929;
+      padding: 8px 20px; border-radius: 8px;
+      text-decoration: none; font-size: 14px; font-weight: 600;
+      transition: opacity .2s;
+    }
+    .nav-cta:hover { opacity: .85; }
+
+    /* ── Hero ── */
+    .hero {
+      text-align: center;
+      padding: 100px 24px 80px;
+      background: radial-gradient(ellipse 80% 60% at 50% 0%, rgba(52,208,88,0.08) 0%, transparent 70%);
+    }
+    .hero-icon {
+      width: 100px; height: 100px;
+      border-radius: 22px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+      margin-bottom: 28px;
+    }
+    .hero h1 {
+      font-size: clamp(40px, 6vw, 64px);
+      font-weight: 700;
+      letter-spacing: -1.5px;
+      line-height: 1.1;
+      margin-bottom: 20px;
+    }
+    .hero h1 span { color: var(--green); }
+    .hero p {
+      font-size: 19px;
+      color: var(--muted);
+      max-width: 560px;
+      margin: 0 auto 40px;
+      line-height: 1.7;
+    }
+    .hero-actions { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
+    .btn-primary {
+      background: var(--green); color: #0b1929;
+      padding: 14px 32px; border-radius: 10px;
+      text-decoration: none; font-size: 16px; font-weight: 700;
+      display: inline-flex; align-items: center; gap: 8px;
+      transition: opacity .2s, transform .15s;
+    }
+    .btn-primary:hover { opacity: .9; transform: translateY(-1px); }
+    .btn-secondary {
+      border: 1px solid var(--border); color: var(--text);
+      padding: 14px 32px; border-radius: 10px;
+      text-decoration: none; font-size: 16px; font-weight: 500;
+      transition: background .2s;
+    }
+    .btn-secondary:hover { background: var(--border); }
+    .hero-note { margin-top: 16px; font-size: 13px; color: var(--muted); }
+
+    /* ── Screenshots ── */
+    .screenshots {
+      padding: 80px 24px;
+      display: flex; justify-content: center; gap: 20px; flex-wrap: wrap;
+    }
+    .screenshot {
+      border-radius: var(--radius);
+      box-shadow: 0 24px 64px rgba(0,0,0,0.5);
+      border: 1px solid var(--border);
+      max-width: 280px;
+      transition: transform .3s;
+    }
+    .screenshot:hover { transform: translateY(-4px); }
+
+    /* ── Features ── */
+    .section { padding: 80px 24px; max-width: 1060px; margin: 0 auto; }
+    .section-label { font-size: 13px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; color: var(--green); margin-bottom: 12px; }
+    .section-title { font-size: clamp(28px, 4vw, 40px); font-weight: 700; letter-spacing: -0.5px; margin-bottom: 16px; }
+    .section-sub { color: var(--muted); font-size: 17px; max-width: 560px; }
+
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 16px;
+      margin-top: 48px;
+    }
+    .feature-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 28px;
+      transition: border-color .2s;
+    }
+    .feature-card:hover { border-color: rgba(52,208,88,0.3); }
+    .feature-icon {
+      width: 40px; height: 40px;
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px;
+      margin-bottom: 16px;
+    }
+    .feature-card h3 { font-size: 16px; font-weight: 600; margin-bottom: 8px; }
+    .feature-card p { font-size: 14px; color: var(--muted); line-height: 1.6; }
+
+    /* ── Legend ── */
+    .legend-grid {
+      display: flex; flex-direction: column; gap: 12px;
+      margin-top: 40px; max-width: 560px;
+    }
+    .legend-row { display: flex; align-items: center; gap: 14px; }
+    .legend-dot {
+      width: 14px; height: 14px; border-radius: 50%; flex-shrink: 0;
+    }
+    .legend-row span { font-size: 14px; color: var(--muted); }
+    .legend-row strong { font-size: 14px; color: var(--text); }
+
+    /* ── Settings screenshots ── */
+    .settings-shots {
+      display: flex; gap: 20px; flex-wrap: wrap;
+      margin-top: 48px; justify-content: center;
+    }
+    .settings-shots img {
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      box-shadow: 0 12px 40px rgba(0,0,0,0.4);
+      max-width: 420px; width: 100%;
+    }
+
+    /* ── Divider ── */
+    .divider { border: none; border-top: 1px solid var(--border); margin: 0 48px; }
+
+    /* ── CTA ── */
+    .cta {
+      text-align: center;
+      padding: 100px 24px;
+      background: radial-gradient(ellipse 60% 80% at 50% 100%, rgba(52,208,88,0.06) 0%, transparent 70%);
+    }
+    .cta h2 { font-size: clamp(28px, 4vw, 44px); font-weight: 700; letter-spacing: -0.5px; margin-bottom: 16px; }
+    .cta p { color: var(--muted); font-size: 17px; margin-bottom: 36px; }
+
+    /* ── Footer ── */
+    footer {
+      text-align: center;
+      padding: 32px;
+      border-top: 1px solid var(--border);
+      font-size: 13px; color: var(--muted);
+    }
+    footer a { color: var(--muted); text-decoration: none; }
+    footer a:hover { color: var(--text); }
+
+    @media (max-width: 600px) {
+      nav { padding: 14px 20px; }
+      .nav-links { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Nav -->
+<nav>
+  <div class="nav-brand">
+    <img src="AppIcon.png" alt="HarbourMaster">
+    HarbourMaster
+  </div>
+  <div class="nav-links">
+    <a href="#features">Features</a>
+    <a href="#docker">Docker</a>
+    <a href="#settings">Settings</a>
+    <a href="https://github.com/jalonsogo/harbourmaster">GitHub</a>
+  </div>
+  <a class="nav-cta" href="https://github.com/jalonsogo/harbourmaster/releases/latest">
+    Download
+  </a>
+</nav>
+
+<!-- Hero -->
+<section class="hero">
+  <img class="hero-icon" src="AppIcon.png" alt="HarbourMaster icon">
+  <h1>Know what's running<br>on your <span>ports</span></h1>
+  <p>A native macOS menu bar app that shows every TCP port in use on your machine — with deep Docker integration, process management, and developer tooling.</p>
+  <div class="hero-actions">
+    <a class="btn-primary" href="https://github.com/jalonsogo/harbourmaster/releases/latest">
+      ↓ &nbsp;Download for macOS
+    </a>
+    <a class="btn-secondary" href="https://github.com/jalonsogo/harbourmaster">
+      View on GitHub
+    </a>
+  </div>
+  <p class="hero-note">macOS 13 Ventura or later · Free &amp; open source</p>
+</section>
+
+<!-- Screenshots -->
+<div class="screenshots">
+  <img class="screenshot" src="screenshots/screen1.png" alt="Main menu">
+  <img class="screenshot" src="screenshots/screen2.png" alt="Docker section">
+  <img class="screenshot" src="screenshots/screen3.png" alt="Port details">
+</div>
+
+<hr class="divider">
+
+<!-- Features -->
+<section class="section" id="features">
+  <div class="section-label">Features</div>
+  <h2 class="section-title">Everything in the menu bar</h2>
+  <p class="section-sub">No window, no Dock icon — just click the icon and see what's running.</p>
+
+  <div class="features-grid">
+    <div class="feature-card">
+      <div class="feature-icon" style="background:rgba(52,208,88,0.12)">🔍</div>
+      <h3>Smart detection</h3>
+      <p>Automatically recognises dev runtimes — node, python, bun, go, ruby, deno, rust — and highlights them regardless of port number.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon" style="background:rgba(77,157,224,0.12)">⚡</div>
+      <h3>Always up to date</h3>
+      <p>Background polling every 5 seconds. A HUD toast appears the moment a port opens or closes — no menu interaction needed.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon" style="background:rgba(240,165,0,0.12)">🛡️</div>
+      <h3>System service protection</h3>
+      <p>Known macOS system services (AirPlay, Handoff, Sharing) are flagged with an orange shield and require confirmation before killing.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon" style="background:rgba(52,208,88,0.12)">🌐</div>
+      <h3>Open anywhere</h3>
+      <p>One click to open any port in your preferred browser, reveal its folder in Finder, or jump straight into a terminal session.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon" style="background:rgba(77,157,224,0.12)">📊</div>
+      <h3>Resource usage</h3>
+      <p>CPU % and memory shown per process. Docker ports display real container stats from <code style="font-size:12px;opacity:.8">docker stats</code>, not proxy RSS.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon" style="background:rgba(240,165,0,0.12)">🔔</div>
+      <h3>HUD notifications</h3>
+      <p>Native floating toast banners — no system notification permissions required. Works immediately out of the box.</p>
+    </div>
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- Docker -->
+<section class="section" id="docker">
+  <div class="section-label">Docker</div>
+  <h2 class="section-title">Deep container integration</h2>
+  <p class="section-sub">Docker ports are resolved to real container names. Grouped by Compose project — one line per stack.</p>
+
+  <div class="features-grid" style="margin-top:40px">
+    <div class="feature-card">
+      <div class="feature-icon" style="background:rgba(52,208,88,0.12)">📦</div>
+      <h3>Compose stacks</h3>
+      <p>Containers are grouped by their <code style="font-size:12px;opacity:.8">com.docker.compose.project</code> label — hover a stack to expand all its services.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon" style="background:rgba(77,157,224,0.12)">🎛️</div>
+      <h3>Container controls</h3>
+      <p>Restart, Pause/Unpause, and Stop any container without leaving the menu bar.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon" style="background:rgba(240,165,0,0.12)">📋</div>
+      <h3>Logs &amp; shell</h3>
+      <p>View container logs or open a shell (<code style="font-size:12px;opacity:.8">docker exec -it</code>) directly in your terminal with one click.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon" style="background:rgba(52,208,88,0.12)">🔗</div>
+      <h3>Docker Desktop &amp; OrbStack</h3>
+      <p>Click any container to jump straight to it in Docker Desktop or OrbStack. Auto-detects which one you have installed.</p>
+    </div>
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- Legend -->
+<section class="section">
+  <div class="section-label">Legend</div>
+  <h2 class="section-title">Colour at a glance</h2>
+
+  <div class="legend-grid">
+    <div class="legend-row">
+      <div class="legend-dot" style="background:#34d058"></div>
+      <div><strong>Dev Port</strong> <span>— known runtime or configured port number</span></div>
+    </div>
+    <div class="legend-row">
+      <div class="legend-dot" style="background:#4d9de0"></div>
+      <div><strong>User Port</strong> <span>— other process running under your account</span></div>
+    </div>
+    <div class="legend-row">
+      <div class="legend-dot" style="background:#34d058; border-radius:3px"></div>
+      <div><strong>Docker Container (running)</strong> <span>— active and serving traffic</span></div>
+    </div>
+    <div class="legend-row">
+      <div class="legend-dot" style="background:#7a94b0; border-radius:3px"></div>
+      <div><strong>Docker Container (paused)</strong></div>
+    </div>
+    <div class="legend-row">
+      <div class="legend-dot" style="background:#f0a500"></div>
+      <div><strong>System Service</strong> <span>— macOS system process (AirPlay, Handoff…)</span></div>
+    </div>
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- Settings -->
+<section class="section" id="settings">
+  <div class="section-label">Settings</div>
+  <h2 class="section-title">Configurable to your stack</h2>
+  <p class="section-sub">Four-tab settings window — launch at login, preferred browser and terminal, Docker manager, custom port ranges.</p>
+
+  <div class="settings-shots">
+    <img src="screenshots/settings1.png" alt="General settings">
+    <img src="screenshots/settings2.png" alt="Dev Ports settings">
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- CTA -->
+<section class="cta">
+  <h2>Free, open source,<br>built for developers</h2>
+  <p>macOS 13 Ventura or later · No App Store · No tracking</p>
+  <a class="btn-primary" href="https://github.com/jalonsogo/harbourmaster/releases/latest">
+    ↓ &nbsp;Download HarbourMaster
+  </a>
+</section>
+
+<!-- Footer -->
+<footer>
+  <p>
+    Built with ♥ by <a href="https://github.com/jalonsogo">jalonsogo</a> ·
+    <a href="https://github.com/jalonsogo/harbourmaster">Source on GitHub</a> ·
+    <a href="https://github.com/jalonsogo/harbourmaster/releases">Releases</a>
+  </p>
+</footer>
+
+</body>
+</html>
